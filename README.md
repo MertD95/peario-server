@@ -43,6 +43,3 @@ PEM_CERT=cert/localhost.crt
 PEM_KEY=cert/localhost.key
 ```
 
-## Deploy
-
-See `deploy/setup.sh` for Oracle Cloud (or any Ubuntu VM) setup.
