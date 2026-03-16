@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WatchParty Server Tester</title>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: #eee; padding: 20px; }
+        .container { display: flex; gap: 20px; }
+        .panel { flex: 1; background: #2a2a2a; padding: 15px; border-radius: 8px; }
+        input, button, select { padding: 8px; margin: 5px 0; border-radius: 4px; border: 1px solid #444; background: #333; color: white; width: 100%; box-sizing: border-box; }
+        button { cursor: pointer; background: #007bff; border: none; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        .status { padding: 5px; margin-bottom: 10px; border-radius: 4px; }
+        .connected { background: #28a74555; }
+        .disconnected { background: #dc354555; }
+        .log-entry { margin-bottom: 5px; font-size: 0.9em; border-bottom: 1px solid #333; padding-bottom: 2px; }
+        .type-in { color: #5bc0de; }
+        .type-out { color: #f0ad4e; }
+        h3 { margin: 15px 0 5px; color: #aaa; font-size: 0.85em; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <h1>WatchParty Server Tester</h1>
+    <p>Use this to simulate a client. Open in two tabs to test syncing.</p>
+
+    <div class="container">
+        <div class="panel">
+            <h2>Connection</h2>
+            <input type="text" id="wsUrl" value="ws://localhost:8181" placeholder="ws://localhost:8181">
+            <button onclick="connect()">Connect</button>
+            <div id="status" class="status disconnected">Status: Disconnected</div>
+
+            <h3>User</h3>
+            <button onclick="updateUser()">Set Username</button>
+
+            <h3>Room</h3>
+            <button onclick="createRoom()">Create Room</button>
+            <input type="text" id="joinId" placeholder="Room ID to join">
+            <button onclick="joinRoom()">Join Room</button>
+            <button class="danger" onclick="leaveRoom()">Leave Room</button>
+
+            <h3>Player Sync</h3>
+            <button onclick="syncPlayer()">Sync Player (Play)</button>
+            <div style="display: flex; gap: 5px;">
+                <select id="speed">
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x</option>
+                </select>
+                <select id="audioTrack">
+                    <option value="0">Audio 0</option>
+                    <option value="1">Audio 1</option>
+                    <option value="2">Audio 2</option>
+                </select>
+                <select id="subtitleTrack">
+                    <option value="-1">Subs Off</option>
+                    <option value="0">Sub 0</option>
+                    <option value="1">Sub 1</option>
+                    <option value="2">Sub 2</option>
+                </select>
+            </div>
+
+            <h3>Stream</h3>
+            <button onclick="updateStream()">Change Stream (owner only)</button>
+
+            <h3>Chat</h3>
+            <input type="text" id="msgContent" placeholder="Message content">
+            <button onclick="sendMessage()">Send Message</button>
+
+            <h3>Ownership</h3>
+            <input type="text" id="ownerUserId" placeholder="User ID to transfer to">
+            <button onclick="transferOwnership()">Transfer Ownership</button>
+        </div>
+
+        <div class="panel">
+            <h2>Event Log</h2>
+            <div id="log" style="height: 500px; overflow-y: auto; background: #000; padding: 10px; border-radius: 4px;"></div>
+            <button onclick="document.getElementById('log').innerHTML=''">Clear Log</button>
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        const logEl = document.getElementById('log');
+
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-entry type-${type}`;
+            const prefix = type === 'in' ? 'RECV' : type === 'out' ? 'SEND' : 'INFO';
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${prefix}: ${msg}`;
+            logEl.prepend(div);
+        }
+
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+            ws = new WebSocket(url);
+
+            ws.onopen = () => {
+                log('Connected to ' + url);
+                document.getElementById('status').className = 'status connected';
+                document.getElementById('status').textContent = 'Status: Connected';
+            };
+
+            ws.onmessage = (event) => {
+                log(event.data, 'in');
+                const data = JSON.parse(event.data);
+                if (data.type === 'room' || data.type === 'sync') {
+                    if (data.payload.id) {
+                        document.getElementById('joinId').value = data.payload.id;
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                log('Disconnected');
+                document.getElementById('status').className = 'status disconnected';
+                document.getElementById('status').textContent = 'Status: Disconnected';
+            };
+
+            ws.onerror = () => {
+                log('Error: Check if server is running.');
+            };
+        }
+
+        function send(type, payload) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return alert('Not connected');
+            const data = JSON.stringify({ type, payload });
+            ws.send(data);
+            log(data, 'out');
+        }
+
+        function updateUser() {
+            const name = prompt("Enter username", "User_" + Math.floor(Math.random() * 1000));
+            if (name) send('user.update', { username: name });
+        }
+
+        function createRoom() {
+            send('room.new', {
+                meta: { id: 'tt0111161', type: 'movie', name: 'The Shawshank Redemption' },
+                stream: { infoHash: '8ca6f333316aba4a769fdb8c2d5824eb9bb92763' }
+            });
+        }
+
+        function joinRoom() {
+            const id = document.getElementById('joinId').value;
+            if (!id) return alert('Enter a room ID');
+            send('room.join', { id });
+        }
+
+        function leaveRoom() {
+            send('room.leave', {});
+        }
+
+        function syncPlayer() {
+            send('player.sync', {
+                paused: false,
+                buffering: false,
+                time: Math.floor(Math.random() * 1000),
+                speed: parseFloat(document.getElementById('speed').value),
+                audioTrack: parseInt(document.getElementById('audioTrack').value),
+                subtitleTrack: parseInt(document.getElementById('subtitleTrack').value),
+            });
+        }
+
+        function updateStream() {
+            send('room.updateStream', {
+                stream: { url: 'http://example.com/new-video.mp4' },
+                meta: { id: 'tt0468569', type: 'movie', name: 'The Dark Knight' }
+            });
+        }
+
+        function sendMessage() {
+            const content = document.getElementById('msgContent').value || "Hello!";
+            send('room.message', { content });
+        }
+
+        function transferOwnership() {
+            const userId = document.getElementById('ownerUserId').value;
+            if (!userId) return alert('Enter a user ID');
+            send('room.updateOwnership', { userId });
+        }
+    </script>
+</body>
+</html>

@@ -1,29 +1,48 @@
-# Peario Server
+# WatchParty Server
+
+WebSocket server for WatchParty — a watch-together app for Stremio.
+
+Originally created by [tymmesyde](https://github.com/tymmesyde). Modernized and maintained by MertD95.
+
+## Quick Start
+
+```bash
+npm install
+npm start
+```
+
+The server starts on `ws://localhost:8181` by default. No certificates needed.
 
 ## Development
 
-Create an SSL certificate
-```
-openssl req -x509 -sha256 -nodes -newkey rsa:2048 -days 365 -keyout localhost.key -out localhost.crt
+```bash
+npm run serve       # Auto-rebuild on file changes
+npm test            # Run all tests
+npm run test:watch  # Run tests in watch mode
 ```
 
-Create a `.env` file at the root of the project and place those variables
+Open `tools/manual-client.html` in a browser to manually test the server.
+
+## Configuration
+
+Copy `.env.example` to `.env` and adjust as needed. All values have sensible defaults:
+
 ```
 PORT=8181
-PEM_CERT=cert/localhost.crt // location of your signed cetficate 
-PEM_KEY=cert/localhost.key // location of your cetficate private key
-INTERVAL_CLIENT_CHECK=3000
-INTERVAL_ROOM_UPDATE=600000
+INTERVAL_ROOM_UPDATE=30000
+PING_INTERVAL=30000
+MAX_CONNECTIONS=10000
+MAX_CONNECTIONS_PER_IP=10
+LOG_LEVEL=info
+NODE_ENV=development
 ```
 
-Open `https://localhost:8181` in your browser and click `Accept the risk and Continue` (Firefox) or `Proceed to localhost (unsafe)` (Chrome)
+For HTTPS/WSS (optional — only needed if not behind a reverse proxy):
+```
+PEM_CERT=cert/localhost.crt
+PEM_KEY=cert/localhost.key
+```
 
-Install dependencies
-```
-npm i
-```
+## Deploy
 
-Run the server
-```
-npm start
-```
+See `deploy/setup.sh` for Oracle Cloud (or any Ubuntu VM) setup.
